@@ -60,6 +60,8 @@ Distributed as-is; no warranty is given.
   *   
   * CANNOT:
   *   find object range more than 100 due to ping sensor read only up to 100(don't know why)
+  *   and result is inconsitent
+  *   - might be the delay in loop or unstable power supple
   *   
   *   find goal
   */
@@ -222,8 +224,6 @@ void loop() //------------------------------------------------------------------
       nextState = BACK_UP; // found it, back away
       break;
     }
-
-    
     
   case GO_FORWARD:
     driveBot(forwardSpeed); // test: go slow
