@@ -275,6 +275,7 @@ void loop() //------------------------------------------------------------------
       nextState = GO_FORWARD;
       Serial.println("Have object, found goal, FORWARD");
       if(pingUpFoundObject(10)) {
+        Serial.println("Reach the Goal with Object!!/n");
         reachGoal = true;
         nextState = END_MOVE;
       }
@@ -341,6 +342,7 @@ boolean haveObject() {
 
   if(pingDownFoundObject(5)){
     distanceObjectExpected = 20;    // in case it loses object
+    Serial.println("I got it!! I got the object ;]/n");
     return true; 
   } else {
     return false; 
