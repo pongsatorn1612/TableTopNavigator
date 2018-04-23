@@ -65,8 +65,11 @@ Distributed as-is; no warranty is given.
   *   
   *   find goal
   *   
+  * Fixed:
+  *   left wheel not turn when FORWARD - Ping pin was the same as motor pin
+  *   
   * Problem:
-  *   left wheel not turn when FORWARD
+  *   
   *
   *Add:
   *   BackUp function
@@ -173,6 +176,20 @@ int distanceExpected = 20; // change bepend on last distance found object //TODO
 
 // end of defining section ---------------------------------------------------
 
+/*Make sure not to fail
+ *No object
+ * Find object
+ * Go to Object
+ * Get Object
+ *Have object
+ * Make sure Object still with Robot grab
+ *  Find Goal
+ *  Go to Goal
+ *  Drop object
+ * Back up 
+ * Done!!
+ */
+
 void setup()
 {
   setupPins(); // Set all pins as outputs
@@ -208,8 +225,12 @@ void setup()
 void loop() //--------------------------------------------------------------------------
 {
 
-  if(!haveObject) {
-    
+  if(arrayFoundCliff()) {   // looking for cliff
+     nextState = BACK_UP; // found it, back away
+  }
+  
+  if(!haveObject && nextState == FIND_OBJECT) { // have object
+    nextState = FIND_GOAL;                      // search for Goal
   }
 
   uint8_t state = nextState;
@@ -223,21 +244,17 @@ void loop() //------------------------------------------------------------------
     
   case FIND_OBJECT: // Problem happen here MOTOR_B dosn't work because of pingDownFoundObject() (Fixed)
 
-    if(arrayFoundCliff()) {   // looking for cliff
-      nextState = BACK_UP; // found it, back away
-      break;
-    }
-
     if(pingDownFoundObject(distanceExpected)) { // search for object
 
       if(pingUpFoundObject(distanceExpected)) {
         nextState = turnWhichWay;
         Serial.println("Found goal/don't have object, Turn");
-      } else {
-        if(!haveObject) { // don't have object, go for it
-          nextState = GO_FORWARD;
-          Serial.println("Found object, FORWARD"); 
-        } 
+        
+      } else { // Lower ping found only, must be object
+         nextState = GO_FORWARD;
+         Serial.println("Found object, FORWARD");
+
+         haveObject = haveObject();
       }
         
     } else {  // not found by lower ping
@@ -249,10 +266,9 @@ void loop() //------------------------------------------------------------------
 
   case FIND_GOAL:
 
-    if(arrayFoundCliff()) {   // looking for cliff
-      nextState = BACK_UP; // found it, back away
-      break;
-    }
+
+
+    break;
     
   case GO_FORWARD: 
     driveBot(forwardSpeed); // test: go slow
@@ -306,6 +322,16 @@ boolean arrayFoundCliff() {
   }
   
 }// arrayFoundCliff end ----------------------------------------------------------------------------------
+
+boolean haveObject() {
+
+  if(pingDownFoundObject(5)){
+    return true;
+  } else {
+    return false 
+  }
+  
+}
 
 boolean pingDownFoundObject(int distanceWanted) {
 
