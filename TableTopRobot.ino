@@ -49,7 +49,7 @@ Distributed as-is; no warranty is given.
 /*****************************************************************************
  * Modify by : Mark
  * 
- * 4/20/2018
+ * 4/22/2018
  ****************************************************************************/
 
  /*
@@ -62,7 +62,9 @@ Distributed as-is; no warranty is given.
   *   find object range more than 100 due to ping sensor read only up to 100
   *   and result is inconsitent
   *   - unstable power supple (fix by seperated power source)
+  *   - circuit problem, cannot find power supply 5V 
   *   
+  *   make sure it can differentiate goal and object
   *   find goal
   *   
   * Fixed:
@@ -115,8 +117,9 @@ int distanceDown;
 int positionCar;
 /////////////////////////////////////////////////////////////////////////
 
-/////////////////////////////////// IR Sensor////////////////////////////
-boolean haveObject = false;
+/////////////////////////////////// Status of environment //////////////
+boolean haveObjectNow = false;
+boolean reachGoal = false;
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -136,6 +139,7 @@ boolean haveObject = false;
 #define GO_RIGHT 6
 #define TURN_LEFT 7
 #define TURN_RIGHT 8
+#define END_MOVE 9
 
 uint8_t nextState;
 
@@ -146,7 +150,8 @@ int density;
 int forwardSpeed = 100; // test value
 int reverseSpeed = 100;
 int turnSpeed = 100;
-int distanceExpected = 20; // change bepend on last distance found object //TODO
+int distanceObjectExpected = 200; // change bepend on last distance found object //TODO
+int distanceGoalExpected = 200;
 
 
 //-----------------------------------------------------------------------
@@ -229,7 +234,7 @@ void loop() //------------------------------------------------------------------
      nextState = BACK_UP; // found it, back away
   }
   
-  if(!haveObject && nextState == FIND_OBJECT) { // have object
+  if(haveObject() && nextState == FIND_OBJECT) { // have object
     nextState = FIND_GOAL;                      // search for Goal
   }
 
@@ -244,9 +249,9 @@ void loop() //------------------------------------------------------------------
     
   case FIND_OBJECT: // Problem happen here MOTOR_B dosn't work because of pingDownFoundObject() (Fixed)
 
-    if(pingDownFoundObject(distanceExpected)) { // search for object
+    if(pingDownFoundObject(distanceObjectExpected)) { // search for object
 
-      if(pingUpFoundObject(distanceExpected)) {
+      if(pingUpFoundObject(distanceObjectExpected)) { // check is this a goal
         nextState = turnWhichWay;
         Serial.println("Found goal/don't have object, Turn");
         
@@ -254,7 +259,7 @@ void loop() //------------------------------------------------------------------
          nextState = GO_FORWARD;
          Serial.println("Found object, FORWARD");
 
-         haveObject = haveObject();
+         haveObjectNow = haveObject(); // check if close enough to get object
       }
         
     } else {  // not found by lower ping
@@ -266,7 +271,16 @@ void loop() //------------------------------------------------------------------
 
   case FIND_GOAL:
 
-
+    if(pingUpFoundObject(distanceGoalExpected)) {
+      nextState = GO_FORWARD;
+      Serial.println("Have object, found goal, FORWARD");
+      if(pingUpFoundObject(10)) {
+        reachGoal = true;
+        nextState = END_MOVE;
+      }
+    } else {
+      nextState = turnWhichWay;
+    }
 
     break;
     
@@ -326,9 +340,10 @@ boolean arrayFoundCliff() {
 boolean haveObject() {
 
   if(pingDownFoundObject(5)){
-    return true;
+    distanceObjectExpected = 20;    // in case it loses object
+    return true; 
   } else {
-    return false 
+    return false; 
   }
   
 }
