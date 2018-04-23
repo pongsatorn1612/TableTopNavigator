@@ -49,7 +49,7 @@ Distributed as-is; no warranty is given.
 /*****************************************************************************
  * Modify by : Mark
  * 
- * 4/15/2018
+ * 4/20/2018
  ****************************************************************************/
 
  /*
@@ -59,12 +59,21 @@ Distributed as-is; no warranty is given.
   *   Turn when detech cliffs from left and right
   *   
   * CANNOT:
-  *   find object range more than 100 due to ping sensor read only up to 100(don't know why)
+  *   find object range more than 100 due to ping sensor read only up to 100
   *   and result is inconsitent
-  *   - might be the delay in loop or unstable power supple
+  *   - unstable power supple (fix by seperated power source)
   *   
   *   find goal
+  *   
+  * Problem:
+  *   left wheel not turn when FORWARD
+  *
+  *Add:
+  *   BackUp function
+  *   Prepare for two ping
+  *   
   */
+  
  
 
 #include "Wire.h"
@@ -89,11 +98,17 @@ SensorBar mySensorBar(SX1509_ADDRESS);
 //////////////////////////////////////////////////////////////////////////
 
 ///////////////////////////////// Ping Sensor ///////////////////////////
-const int trigPin = 9;   // sending sound out
-const int echoPin = 10;  // receive sound in
+const int trigPinUp = 9;   // sending sound out
+const int echoPinUp = 10;  // receive sound in
+const int trigPinDown = 7;  // 11
+const int echoPinDown = 8;  // 12 Created MOTOR_B not work???
 
-long duration;
-int distance;
+long durationUp;
+int distanceUp;
+
+long durationDown;
+int distanceDown;
+
 int positionCar;
 /////////////////////////////////////////////////////////////////////////
 
@@ -127,7 +142,8 @@ int density;
 
 int forwardSpeed = 100; // test value
 int reverseSpeed = 100;
-int distanceExpected = 10;
+int turnSpeed = 100;
+int distanceExpected = 20; // change bepend on last distance found object //TODO
 
 
 //-----------------------------------------------------------------------
@@ -192,6 +208,9 @@ void setup()
 void loop() //--------------------------------------------------------------------------
 {
 
+  if(!haveObject) {
+    
+  }
 
   uint8_t state = nextState;
   
@@ -202,20 +221,30 @@ void loop() //------------------------------------------------------------------
     nextState = FIND_OBJECT;
     break;
     
-  case FIND_OBJECT:
+  case FIND_OBJECT: // Problem happen here MOTOR_B dosn't work because of pingDownFoundObject() (Fixed)
 
     if(arrayFoundCliff()) {   // looking for cliff
       nextState = BACK_UP; // found it, back away
       break;
     }
 
-    if(pingFoundObject(distanceExpected)) { // search for object
-      nextState = GO_FORWARD;
-      Serial.println("FORWARD");
-    } else {                  // not found
+    if(pingDownFoundObject(distanceExpected)) { // search for object
+
+      if(pingUpFoundObject(distanceExpected)) {
+        nextState = turnWhichWay;
+        Serial.println("Found goal/don't have object, Turn");
+      } else {
+        if(!haveObject) { // don't have object, go for it
+          nextState = GO_FORWARD;
+          Serial.println("Found object, FORWARD"); 
+        } 
+      }
+        
+    } else {  // not found by lower ping
       nextState = turnWhichWay; // turn accordingly
-      Serial.println("Turn");
+      Serial.println("No obeject, Turn");
     }
+    
     break;
 
   case FIND_GOAL:
@@ -225,7 +254,7 @@ void loop() //------------------------------------------------------------------
       break;
     }
     
-  case GO_FORWARD:
+  case GO_FORWARD: 
     driveBot(forwardSpeed); // test: go slow
     nextState = FIND_OBJECT;
     break;
@@ -278,27 +307,55 @@ boolean arrayFoundCliff() {
   
 }// arrayFoundCliff end ----------------------------------------------------------------------------------
 
-boolean pingFoundObject(int distanceWanted) {
+boolean pingDownFoundObject(int distanceWanted) {
 
   // Clears the trigPin
-  digitalWrite(trigPin, LOW);
+  digitalWrite(trigPinDown, LOW);
   delayMicroseconds(2);
 
   // Sets the trigPin on HIGH state for 10 micro seconds
-  digitalWrite(trigPin, HIGH);
+  digitalWrite(trigPinDown, HIGH);
   delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
+  digitalWrite(trigPinDown, LOW);
 
   // Reads the echoPin, returns the sound wave travel time in microseconds
-  duration = pulseIn(echoPin, HIGH);
+  durationDown = pulseIn(echoPinDown, HIGH);
 
   // Calculating the distance
-  distance= duration*0.034/2;
+  distanceDown = durationDown*0.034/2;
 
-  Serial.print("Distance : ");
-  Serial.println(distance);
+  Serial.print("Distance Lower Ping : ");
+  Serial.println(distanceDown);
 
-  if(distance <= distanceWanted) {
+  if(distanceDown <= distanceWanted) {
+    return true;
+  } else {
+    return false;
+  }
+  
+}
+  
+boolean pingUpFoundObject(int distanceWanted) {
+
+  // Clears the trigPin
+  digitalWrite(trigPinUp, LOW);
+  delayMicroseconds(2);
+
+  // Sets the trigPin on HIGH state for 10 micro seconds
+  digitalWrite(trigPinUp, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPinUp, LOW);
+
+  // Reads the echoPin, returns the sound wave travel time in microseconds
+  durationUp = pulseIn(echoPinUp, HIGH);
+
+  // Calculating the distance
+  distanceUp = durationUp*0.034/2;
+
+  Serial.print("Distance Upper Ping : ");
+  Serial.println(distanceUp);
+
+  if(distanceUp <= distanceWanted) {
     return true;
   } else {
     return false;
@@ -366,8 +423,11 @@ void stopArdumoto(byte motor)
 void setupPins()
 {
   // setup ping sensor pins
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
+  pinMode(trigPinUp, OUTPUT);
+  pinMode(echoPinUp, INPUT);
+
+  pinMode(trigPinDown, OUTPUT);
+  pinMode(echoPinDown, INPUT);
   
   // All pins should be setup as outputs:
   pinMode(PWMA, OUTPUT);
@@ -438,8 +498,8 @@ void turnBot( float turnInput )
 	}
   if(turnInput == 2) // TRUN_LEFT
   {
-    rightVar =200;
-    leftVar = 200; // -200
+    rightVar = turnSpeed;
+    leftVar = turnSpeed; // -200
     driveArdumoto(MOTOR_A, FORWARD, rightVar);
     driveArdumoto(MOTOR_B, REVERSE, leftVar);
   }
@@ -452,8 +512,8 @@ void turnBot( float turnInput )
 	}
   if(turnInput == -2) // TRUN_RIGHT
   {
-    rightVar = 200; // -200
-    leftVar = 200;
+    rightVar = turnSpeed; // -200
+    leftVar = turnSpeed;
     driveArdumoto(MOTOR_A, REVERSE, rightVar);
     driveArdumoto(MOTOR_B, FORWARD, leftVar);
   }
