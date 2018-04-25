@@ -124,10 +124,10 @@ boolean haveObjectNow = false;
 boolean reachGoal = false;
 
 int distanceObjectMax = 200; // change bepend on last distance found object //TODO
-int distanceObjectMin = 10;
+int distanceObjectMin = 0;
 
 int distanceGoalMax = 200;// different object from goal
-int distanceGoalMin = 10;
+int distanceGoalMin = 0;
 
 int checkingDistance = 6;
 
@@ -256,13 +256,15 @@ void loop() //------------------------------------------------------------------
     
   case FIND_OBJECT: // Problem happen here MOTOR_B dosn't work because of pingDownFoundObject() (Fixed)
 
-    if(pingDownFoundObject(distanceObjectMax)) { // search for object
+    if(pingDownFoundObject(distanceObjectMax , distanceObjectMin)) { // search for object
 
-      if(pingDownFoundObject(checkingDistance)) { // close enough to check if it is a goal or object
+      if(distanceDown <= checkingDistance) { // close enough to check if it is a goal or object
+        Serial.println("Close detect, check if it is object or goal");
         isThisObject();                           // checking and updating variable
+        
       } else {
         nextState = GO_FORWARD;
-        Serial.println("Found something, FORWARD");
+        Serial.println("Found something at distance, FORWARD");
       }
         
     } else {  // not found by lower ping
@@ -334,7 +336,7 @@ boolean isThisObject() {
   
   for(int i = 0; i<10; i++) {
     
-    if(pingUpFoundObject(checkingDistance)) { // for precise dicision
+    if(pingUpFoundObject(checkingDistance, 0)) { // for precise dicision
       trueValue++;
     }
   }
@@ -343,14 +345,18 @@ boolean isThisObject() {
     nextState = turnWhichWay;
     Serial.println("Found goal/don't have object, Turn");
 
-    distanceGoalMax = 4; // locate Goal
-    distanceGoalMin = 0;
+    distanceGoalMax = 10; // locate Goal
+    distanceGoalMin = 6;
+
+    distanceObjectMin = 11; // prevent detect the goal again
         
   } else { // Lower ping found only, must be object
      nextState = GO_FORWARD;
      Serial.println("Found object, FORWARD");
 
      haveObjectNow = haveObject(); // check if close enough to get object
+     Serial.println("OOOOOOOOOOOOOOOOOOOOOOOOOOO");
+     Serail.println("Got the object, FIND_GOAL statu");
 
      distanceObjectMax = 20;
      distanceObjectMin = 5;
@@ -402,7 +408,7 @@ boolean pingDownFoundObject(int maxDistance, int minDistance) {
   Serial.print("Distance Lower Ping : ");
   Serial.println(distanceDown);
 
-  if(distanceDown <= distanceWanted ) {
+  if(distanceDown <= maxDistance && distanceDown >= minDistance ) {
     return true;
   } else {
     return false;
@@ -410,7 +416,7 @@ boolean pingDownFoundObject(int maxDistance, int minDistance) {
   
 }
   
-boolean pingUpFoundObject(int distanceWanted) {
+boolean pingUpFoundObject(int maxDistance, int minDistance) {
 
   // Clears the trigPin
   digitalWrite(trigPinUp, LOW);
@@ -430,7 +436,7 @@ boolean pingUpFoundObject(int distanceWanted) {
   Serial.print("Distance Upper Ping : ");
   Serial.println(distanceUp);
 
-  if(distanceUp <= distanceWanted) {
+  if(distanceUp <= maxDistance && distanceUp >= minDistance) {
     return true;
   } else {
     return false;
