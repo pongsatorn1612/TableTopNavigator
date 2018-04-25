@@ -99,6 +99,9 @@ const uint8_t SX1509_ADDRESS = 0x3E;  // SX1509 I2C address (00)
 //const byte SX1509_ADDRESS = 0x71;  // SX1509 I2C address (11)
 
 SensorBar mySensorBar(SX1509_ADDRESS);
+
+int density;
+int positionCar;
                                                                         
 //////////////////////////////////////////////////////////////////////////
 
@@ -114,12 +117,19 @@ int distanceUp;
 long durationDown;
 int distanceDown;
 
-int positionCar;
 /////////////////////////////////////////////////////////////////////////
 
 /////////////////////////////////// Status of environment //////////////
 boolean haveObjectNow = false;
 boolean reachGoal = false;
+
+int distanceObjectMax = 200; // change bepend on last distance found object //TODO
+int distanceObjectMin = 10;
+
+int distanceGoalMax = 200;// different object from goal
+int distanceGoalMin = 10;
+
+int checkingDistance = 6;
 
 /////////////////////////////////////////////////////////////////////////
 
@@ -145,13 +155,10 @@ uint8_t nextState;
 
 
 int turnWhichWay = TURN_RIGHT ; // make it smarter by keep track of the last cliff
-int density;
 
 int forwardSpeed = 100; // test value
 int reverseSpeed = 100;
 int turnSpeed = 100;
-int distanceObjectExpected = 200; // change bepend on last distance found object //TODO
-int distanceGoalExpected = 200;
 
 
 //-----------------------------------------------------------------------
@@ -249,17 +256,13 @@ void loop() //------------------------------------------------------------------
     
   case FIND_OBJECT: // Problem happen here MOTOR_B dosn't work because of pingDownFoundObject() (Fixed)
 
-    if(pingDownFoundObject(distanceObjectExpected)) { // search for object
+    if(pingDownFoundObject(distanceObjectMax)) { // search for object
 
-      if(pingUpFoundObject(distanceObjectExpected)) { // check is this a goal
-        nextState = turnWhichWay;
-        Serial.println("Found goal/don't have object, Turn");
-        
-      } else { // Lower ping found only, must be object
-         nextState = GO_FORWARD;
-         Serial.println("Found object, FORWARD");
-
-         haveObjectNow = haveObject(); // check if close enough to get object
+      if(pingDownFoundObject(checkingDistance)) { // close enough to check if it is a goal or object
+        isThisObject();                           // checking and updating variable
+      } else {
+        nextState = GO_FORWARD;
+        Serial.println("Found something, FORWARD");
       }
         
     } else {  // not found by lower ping
@@ -271,7 +274,7 @@ void loop() //------------------------------------------------------------------
 
   case FIND_GOAL:
 
-    if(pingUpFoundObject(distanceGoalExpected)) {
+    if(pingUpFoundObject(distanceGoalMax)) {
       nextState = GO_FORWARD;
       Serial.println("Have object, found goal, FORWARD");
       if(pingUpFoundObject(10)) {
@@ -325,6 +328,36 @@ void loop() //------------------------------------------------------------------
   
 } // end loop() --------------------------------------------------------------
 
+boolean isThisObject() {
+
+  int trueValue = 0;
+  
+  for(int i = 0; i<10; i++) {
+    
+    if(pingUpFoundObject(checkingDistance)) { // for precise dicision
+      trueValue++;
+    }
+  }
+  
+  if(trueValue > 5) { // check is this a goal
+    nextState = turnWhichWay;
+    Serial.println("Found goal/don't have object, Turn");
+
+    distanceGoalMax = 4; // locate Goal
+    distanceGoalMin = 0;
+        
+  } else { // Lower ping found only, must be object
+     nextState = GO_FORWARD;
+     Serial.println("Found object, FORWARD");
+
+     haveObjectNow = haveObject(); // check if close enough to get object
+
+     distanceObjectMax = 20;
+     distanceObjectMin = 5;
+  }
+
+}
+
 // Check if in front is a cliff----------------------------------------------------------------------
 boolean arrayFoundCliff() {
 
@@ -341,7 +374,6 @@ boolean arrayFoundCliff() {
 boolean haveObject() {
 
   if(pingDownFoundObject(5)){
-    distanceObjectExpected = 20;    // in case it loses object
     Serial.println("I got it!! I got the object ;]/n");
     return true; 
   } else {
@@ -350,7 +382,7 @@ boolean haveObject() {
   
 }
 
-boolean pingDownFoundObject(int distanceWanted) {
+boolean pingDownFoundObject(int maxDistance, int minDistance) {
 
   // Clears the trigPin
   digitalWrite(trigPinDown, LOW);
@@ -370,7 +402,7 @@ boolean pingDownFoundObject(int distanceWanted) {
   Serial.print("Distance Lower Ping : ");
   Serial.println(distanceDown);
 
-  if(distanceDown <= distanceWanted) {
+  if(distanceDown <= distanceWanted ) {
     return true;
   } else {
     return false;
