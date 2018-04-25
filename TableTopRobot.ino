@@ -269,17 +269,17 @@ void loop() //------------------------------------------------------------------
         
     } else {  // not found by lower ping
       nextState = turnWhichWay; // turn accordingly
-      Serial.println("No obeject, Turn");
+      Serial.println("No obeject in range, Turn");
     }
     
     break;
 
   case FIND_GOAL:
 
-    if(pingUpFoundObject(distanceGoalMax)) {
+    if(pingUpFoundObject(distanceGoalMax, distanceGoalMin)) {
       nextState = GO_FORWARD;
       Serial.println("Have object, found goal, FORWARD");
-      if(pingUpFoundObject(10)) {
+      if(pingUpFoundObject(checkingDistance, 0)) {
         Serial.println("Reach the Goal with Object!!/n");
         reachGoal = true;
         nextState = END_MOVE;
@@ -318,6 +318,14 @@ void loop() //------------------------------------------------------------------
     turnBot(-2);
     nextState = FIND_OBJECT;
     break;
+
+  case END_MOVE:
+    Serial.println("YEPEEEEE");
+    driveArdumoto(MOTOR_A, REVERSE, reverseSpeed);
+    driveArdumoto(MOTOR_B, REVERSE, reverseSpeed);
+    delay(1000);
+    stopArdumoto(MOTOR_A);
+    stopArdumoto(MOTOR_B);
     
   default:
     stopArdumoto(MOTOR_A);
@@ -356,8 +364,11 @@ boolean isThisObject() {
 
      haveObjectNow = haveObject(); // check if close enough to get object
      Serial.println("OOOOOOOOOOOOOOOOOOOOOOOOOOO");
-     Serail.println("Got the object, FIND_GOAL statu");
+     Serial.println("Got the object, FIND_GOAL statu");
 
+     distanceGoalMax = 200; // prepare to find Goal
+     distanceGoalMin = 5;
+     
      distanceObjectMax = 20;
      distanceObjectMin = 5;
   }
@@ -379,7 +390,7 @@ boolean arrayFoundCliff() {
 
 boolean haveObject() {
 
-  if(pingDownFoundObject(5)){
+  if(pingDownFoundObject(checkingDistance , 0)){
     Serial.println("I got it!! I got the object ;]/n");
     return true; 
   } else {
